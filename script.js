@@ -183,23 +183,62 @@ function resetToken() {
   document.getElementById("tokenDisplay").textContent = "";
 }
 
-window.onload = function () {
-  const lastToken = localStorage.getItem("lastGeneratedToken");
-  if (lastToken) {
-    document.getElementById("tokenDisplay").textContent = lastToken;
-  }
-  displayAppointmentDetails();
-};
+function generateQRCode(text) {
+  // Clear any previous QR Code
+  const qrCodeDiv = document.getElementById("qrcode");
+  qrCodeDiv.innerHTML = "";
 
+  // Generate the QR Code inside the div
+  new QRCode(qrCodeDiv, {
+    text: text,
+    width: 128,
+    height: 128,
+    colorDark: "#000000",
+    colorLight: "#ffffff",
+    correctLevel: QRCode.CorrectLevel.H,
+  });
+
+  // Convert QR Code to a Data URL
+  const qrCodeImageDataURL = qrCodeDiv.firstChild.toDataURL("image/png");
+
+  // Save QR Code image to localStorage
+  localStorage.setItem("qrCodeImage", qrCodeImageDataURL);
+
+  // Display QR Code in the div
+  qr.makeCode(text);
+}
+
+// Function to download QR Code image
+function downloadQRCode() {
+  const qrCodeImageDataURL = localStorage.getItem("qrCodeImage");
+  if (qrCodeImageDataURL) {
+    const downloadLink = document.createElement("a");
+    downloadLink.href = qrCodeImageDataURL;
+    downloadLink.download = "qr-code.png";
+    downloadLink.click();
+  } else {
+    alert("No QR code generated yet.");
+  }
+}
+
+// Event listener for download button
+document
+  .getElementById("downloadQRCodeButton")
+  .addEventListener("click", downloadQRCode);
+
+// Event listener for generating token
 document
   .getElementById("generateTokenButton")
   .addEventListener("click", generateAndDisplayToken);
+
+// Event listener for resetting token
 document.getElementById("resetButton").addEventListener("click", resetToken);
 
 // Booking appointment
 document.getElementById("bookAppointment").addEventListener("click", () => {
   const patientName = document.getElementById("patientName").value;
   const patientAddress = document.getElementById("patientAddress").value;
+  const appointmentCause = document.getElementById("appointmentCause").value;
   const token = document.getElementById("tokenDisplay").textContent;
   const capturedImageSrc = document.getElementById("capturedImage").src;
   const recordings = JSON.parse(localStorage.getItem("recordings")) || [];
@@ -207,6 +246,7 @@ document.getElementById("bookAppointment").addEventListener("click", () => {
   if (
     !patientName ||
     !patientAddress ||
+    !appointmentCause ||
     !capturedImageSrc ||
     !recordings.length ||
     !token
@@ -218,6 +258,7 @@ document.getElementById("bookAppointment").addEventListener("click", () => {
   const appointmentDetails = {
     patientName,
     patientAddress,
+    appointmentCause,
     token,
     capturedImageSrc,
     recordings,
@@ -229,38 +270,81 @@ document.getElementById("bookAppointment").addEventListener("click", () => {
   );
 
   displayAppointmentDetails();
+  generateQRCodeFromAppointmentDetails(appointmentDetails);
 });
 
+// Function to display appointment details
 function displayAppointmentDetails() {
   const appointmentDetails = JSON.parse(
     localStorage.getItem("appointmentDetails")
   );
   if (appointmentDetails) {
-    const { patientName, patientAddress, token, capturedImageSrc, recordings } =
-      appointmentDetails;
+    const {
+      patientName,
+      patientAddress,
+      appointmentCause,
+      token,
+      capturedImageSrc,
+      recordings,
+    } = appointmentDetails;
     const detailsHTML = `
-            <h3>Appointment Details</h3>
-            <p><strong>Name:</strong> ${patientName}</p>
-            <p><strong>Address:</strong> ${patientAddress}</p>
-            <p><strong>Token:</strong> ${token}</p>
-            <div>
-                <h4>Captured Photo:</h4>
-                <img src="${capturedImageSrc}" class="img-fluid" />
-            </div>
-            <div>
-                <h4>Recorded Audio:</h4>
-                ${recordings
-                  .map(
-                    (recording, index) => `
-                    <div>
-                        <audio controls src="${recording}"></audio>
-                        <button class="btn btn-warning" onclick="deleteRecording(${index})">Delete</button>
-                    </div>
-                `
-                  )
-                  .join("")}
-            </div>
-        `;
+      <h3>Appointment Details</h3>
+      <p><strong>Name:</strong> ${patientName}</p>
+      <p><strong>Address:</strong> ${patientAddress}</p>
+      <p><strong>Cause of Appointment:</strong> ${appointmentCause}</p>
+      <p><strong>Token:</strong> ${token}</p>
+      <div>
+        <h4>Captured Photo:</h4>
+        <img src="${capturedImageSrc}" class="img-fluid" />
+      </div>
+      <div>
+        <h4>Recorded Audio:</h4>
+        ${recordings
+          .map(
+            (recording, index) => `
+          <div>
+            <audio controls src="${recording}"></audio>
+            <button class="btn btn-warning" onclick="deleteRecording(${index})">Delete</button>
+          </div>
+        `
+          )
+          .join("")}
+      </div>
+    `;
     document.getElementById("appointmentDetails").innerHTML = detailsHTML;
   }
 }
+
+// Function to generate QR code from appointment details
+function generateQRCodeFromAppointmentDetails(details) {
+  const { patientName, patientAddress, appointmentCause, token } = details;
+  const qrCodeContent = `Name: ${patientName}, Address: ${patientAddress}, Cause: ${appointmentCause}, Token: ${token}`;
+  generateQRCode(qrCodeContent);
+}
+
+// Function to combine all code snippets into one and generate a QR Code
+function combineCodeAndGenerateQR() {
+  // Combine all your code snippets into one string
+  let combinedCode = `// Your combined code here`;
+
+  // Encode the combined code as a Base64 string
+  let encodedCode = btoa(combinedCode);
+
+  // Generate and display the QR Code
+  generateQRCode(encodedCode);
+}
+
+// Event listener for a button to combine code and generate QR Code
+document
+  .getElementById("combineAndGenerateQRButton")
+  .addEventListener("click", combineCodeAndGenerateQR);
+
+// Load QR Code from localStorage on window load
+window.onload = function () {
+  const qrCodeImageDataURL = localStorage.getItem("qrCodeImage");
+  if (qrCodeImageDataURL) {
+    const qrCodeDiv = document.getElementById("qrcode");
+    qrCodeDiv.innerHTML = `<img src="${qrCodeImageDataURL}" alt="QR Code" />`;
+  }
+  displayAppointmentDetails();
+};
